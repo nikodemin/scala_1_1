@@ -1,3 +1,3 @@
-package ru.otus.sc.greet.model
+package ru.otus.sc.model.dto
 
 case class GreetRequest(name: String, isHuman: Boolean = true)
