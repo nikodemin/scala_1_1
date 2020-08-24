@@ -1,8 +1,10 @@
 package ru.otus.sc
 
+import java.util.UUID
+
 import ru.otus.sc.dao.impl._
 import ru.otus.sc.model.dto.{GreetRequest, GreetResponse}
-import ru.otus.sc.model.entity.{Album, StorageValue, Track}
+import ru.otus.sc.model.entity.{Album, Band, StorageValue, Track}
 import ru.otus.sc.model.enums.Key.Key
 import ru.otus.sc.service.impl.{EchoServiceImpl, GreetingServiceImpl, MusicServiceImpl, ValuesServiceImpl}
 import ru.otus.sc.service.{EchoService, GreetingService, MusicService, ValuesService}
@@ -79,6 +81,30 @@ trait App {
    * @return List[Track]
    */
   def getTracksBySingerName(name: String): List[Track]
+
+  def addBand(band: Band): Boolean
+
+  def addAlbum(bandId: UUID, album: Album): Boolean
+
+  def addTrack(albumId: UUID, track: Track): Boolean
+
+  def updateBand(band: Band): Boolean
+
+  def updateAlbum(album: Album): Boolean
+
+  def updateTrack(track: Track): Boolean
+
+  def deleteBand(id: UUID): Boolean
+
+  def deleteAlbum(id: UUID): Boolean
+
+  def deleteTrack(id: UUID): Boolean
+
+  def getBandByName(name: String): Option[Band]
+
+  def getAlbumByName(name: String): Option[Album]
+
+  def getTracksByAlbumName(name: String): List[Track]
 }
 
 object App {
@@ -127,6 +153,66 @@ object App {
       invocationCounter += 1
       app.getTracksBySingerName(name)
     }
+
+    override def addBand(band: Band): Boolean = {
+      invocationCounter += 1
+      app.addBand(band)
+    }
+
+    override def addAlbum(bandId: UUID, album: Album): Boolean = {
+      invocationCounter += 1
+      app.addAlbum(bandId, album)
+    }
+
+    override def addTrack(albumId: UUID, track: Track): Boolean = {
+      invocationCounter += 1
+      app.addTrack(albumId, track)
+    }
+
+    override def updateBand(band: Band): Boolean = {
+      invocationCounter += 1
+      app.updateBand(band)
+    }
+
+    override def updateAlbum(album: Album): Boolean = {
+      invocationCounter += 1
+      app.updateAlbum(album)
+    }
+
+    override def updateTrack(track: Track): Boolean = {
+      invocationCounter += 1
+      app.updateTrack(track)
+    }
+
+    override def deleteBand(id: UUID): Boolean = {
+      invocationCounter += 1
+      app.deleteBand(id)
+    }
+
+    override def deleteAlbum(id: UUID): Boolean = {
+      invocationCounter += 1
+      app.deleteAlbum(id)
+    }
+
+    override def deleteTrack(id: UUID): Boolean = {
+      invocationCounter += 1
+      app.deleteTrack(id)
+    }
+
+    override def getBandByName(name: String): Option[Band] = {
+      invocationCounter += 1
+      app.getBandByName(name)
+    }
+
+    override def getAlbumByName(name: String): Option[Album] = {
+      invocationCounter += 1
+      app.getAlbumByName(name)
+    }
+
+    override def getTracksByAlbumName(name: String): List[Track] = {
+      invocationCounter += 1
+      app.getTracksByAlbumName(name)
+    }
   }
 
   private class AppImpl(greeting: GreetingService, echo: EchoService, valuesService: ValuesService, musicService: MusicService) extends App {
@@ -147,6 +233,30 @@ object App {
     override def getTracksByBandName(name: String): List[Track] = musicService.getTracksByBandName(name)
 
     override def getTracksBySingerName(name: String): List[Track] = musicService.getTracksBySingerName(name)
+
+    override def addBand(band: Band): Boolean = musicService.addBand(band)
+
+    override def addAlbum(bandId: UUID, album: Album): Boolean = musicService.addAlbum(bandId, album)
+
+    override def addTrack(albumId: UUID, track: Track): Boolean = musicService.addTrack(albumId, track)
+
+    override def updateBand(band: Band): Boolean = musicService.updateBand(band)
+
+    override def updateAlbum(album: Album): Boolean = musicService.updateAlbum(album)
+
+    override def updateTrack(track: Track): Boolean = musicService.updateTrack(track)
+
+    override def deleteBand(id: UUID): Boolean = musicService.deleteBand(id)
+
+    override def deleteAlbum(id: UUID): Boolean = musicService.deleteAlbum(id)
+
+    override def deleteTrack(id: UUID): Boolean = musicService.deleteTrack(id)
+
+    override def getBandByName(name: String): Option[Band] = musicService.getBandByName(name)
+
+    override def getAlbumByName(name: String): Option[Album] = musicService.getAlbumByName(name)
+
+    override def getTracksByAlbumName(name: String): List[Track] = musicService.getTracksByAlbumName(name)
   }
 
   def apply(): App = {

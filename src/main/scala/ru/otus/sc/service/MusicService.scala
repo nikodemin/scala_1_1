@@ -1,6 +1,8 @@
 package ru.otus.sc.service
 
-import ru.otus.sc.model.entity.{Album, Track}
+import java.util.UUID
+
+import ru.otus.sc.model.entity.{Album, Band, Track}
 
 /**
  * Music service
@@ -28,4 +30,28 @@ trait MusicService {
    * @return List[Track]
    */
   def getTracksBySingerName(name: String): List[Track]
+
+  def getBandByName(name: String): Option[Band]
+
+  def getAlbumByName(name: String): Option[Album]
+
+  def getTracksByAlbumName(name: String): List[Track]
+
+  def addBand(band: Band): Boolean
+
+  def addAlbum(bandId: UUID, album: Album): Boolean
+
+  def addTrack(albumId: UUID, track: Track): Boolean
+
+  def updateBand(band: Band): Boolean
+
+  def updateAlbum(album: Album): Boolean
+
+  def updateTrack(track: Track): Boolean
+
+  def deleteBand(id: UUID): Boolean
+
+  def deleteAlbum(id: UUID): Boolean
+
+  def deleteTrack(id: UUID): Boolean
 }
