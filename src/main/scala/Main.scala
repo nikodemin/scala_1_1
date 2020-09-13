@@ -1,37 +1,52 @@
-import java.time.LocalDate
-import java.util.UUID
+import akka.actor.ActorSystem
+import akka.http.scaladsl.Http
+import org.flywaydb.core.Flyway
+import ru.otus.sc.config.DbConfig
+import ru.otus.sc.dao.impl.{AlbumDaoImpl, BandDaoImpl, TrackDaoImpl}
+import ru.otus.sc.route.{AlbumRouter, BandRouter, MusicRouterGuard, TrackRouter}
+import ru.otus.sc.service.impl.{AlbumServiceImpl, BandServiceImpl, TrackServiceImpl}
+import slick.jdbc.JdbcBackend.Database
 
-import ru.otus.sc.App
-import ru.otus.sc.model.dto.GreetRequest
-import ru.otus.sc.model.entity.{Album, Band, StorageValue, Track}
-import ru.otus.sc.model.enums.Key
+import scala.io.StdIn
+import scala.util.Using
 
 object Main {
   def main(args: Array[String]): Unit = {
-    val app = App()
-    val trackUuid = UUID.randomUUID()
+    implicit val system: ActorSystem = ActorSystem("system")
 
-    List(
-      app.greet(GreetRequest("Nikita")).greeting,
+    import system.dispatcher
 
-      app.getAllValues,
-      app.getByKey(Key.b),
-      app.setKey(Key.c, new StorageValue("Bob", 99)),
-      app.getAllValues,
+    val config = DbConfig.default
 
-      app.getTracksByBandName("Papa Roach"),
-      app.getAllAlbums,
-      app.getTracksBySingerName("Anthony Kiedis"),
-      app.getInvocations,
-      app.addBand(Band("band1", "singer1", LocalDate.now(), List.empty)),
-      app.addAlbum(app.getBandByName("band1").get.id, Album("album1", LocalDate.now(), List.empty, null)),
-      app.addAlbum(app.getBandByName("band1").get.id, Album("album2", LocalDate.now(), List.empty, null)),
-      app.addTrack(app.getAlbumByName("album1").get.id, Track("track1", 3.2f, null)),
-      app.addTrack(app.getAlbumByName("album1").get.id, Track("track2", 3.2f, null, trackUuid)),
-      app.updateAlbum(app.getAlbumByName("album1").get.copy(name = "new album")),
-      app.getTracksByAlbumName("new album"),
-      app.deleteTrack(trackUuid),
-      app.getTracksByAlbumName("new album")
-    ).foreach(println)
+    Using.resource(Database.forURL(config.dbUrl, config.dbUserName, config.dbPassword)) { db =>
+
+      Flyway
+        .configure()
+        .dataSource(config.dbUrl, config.dbUserName, config.dbPassword)
+        .load()
+        .migrate()
+
+      val albumDao = new AlbumDaoImpl(db)
+      val bandDao = new BandDaoImpl(db)
+      val trackDao = new TrackDaoImpl(db)
+
+      val bandService = new BandServiceImpl(bandDao)
+      val albumService = new AlbumServiceImpl(albumDao)
+      val trackService = new TrackServiceImpl(trackDao)
+
+      val bandRouter = new BandRouter(bandService)
+      val albumRouter = new AlbumRouter(albumService)
+      val trackRouter = new TrackRouter(trackService)
+
+      val musicRouter = new MusicRouterGuard(List(bandRouter, albumRouter, trackRouter))
+
+      val binding = Http().newServerAt("localhost", 8080).bind(musicRouter.route)
+
+      binding.foreach(b => println(s"Binding on ${b.localAddress}"))
+
+      StdIn.readLine()
+
+      binding.flatMap(_.unbind()).onComplete(_ => system.terminate())
+    }
   }
 }
