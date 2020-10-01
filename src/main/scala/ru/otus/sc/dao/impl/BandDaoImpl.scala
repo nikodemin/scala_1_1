@@ -20,6 +20,11 @@ class BandDaoImpl(db: Database)(implicit ec: ExecutionContext) extends BandDao {
     db.run(action).map(_.toList)
   }
 
+  override def getByNameContaining(name: String): Future[List[(BandRow, AlbumRow)]] = {
+    val action = joinAlbum.filter(_._1.name.toLowerCase like s"%${name.toLowerCase}%").result
+    db.run(action).map(_.toList)
+  }
+
   override def getById(id: UUID, forUpdate: Boolean): Future[List[(BandRow, AlbumRow)]] = {
     val query = joinAlbum.filter(_._1.id === id)
     val resQuery = if (forUpdate) query.forUpdate else query
@@ -49,4 +54,5 @@ class BandDaoImpl(db: Database)(implicit ec: ExecutionContext) extends BandDao {
   }
 
   private def joinAlbum: Query[(Band, Album), (BandRow, AlbumRow), Seq] = bands join albums on (_.id === _.bandId)
+
 }

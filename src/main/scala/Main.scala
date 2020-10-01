@@ -1,20 +1,25 @@
-import akka.actor.ActorSystem
+import akka.actor.typed.{ActorSystem, Scheduler}
+import akka.actor.{ActorSystem => CLassicActorSystem}
 import akka.http.scaladsl.Http
+import akka.http.scaladsl.server.Directives._
+import akka.util.Timeout
 import org.flywaydb.core.Flyway
+import ru.otus.sc.actor.GateActor
 import ru.otus.sc.config.DbConfig
 import ru.otus.sc.dao.impl.{AlbumDaoImpl, BandDaoImpl, TrackDaoImpl}
-import ru.otus.sc.route.{AlbumRouter, BandRouter, MusicRouterGuard, TrackRouter}
+import ru.otus.sc.route._
 import ru.otus.sc.service.impl.{AlbumServiceImpl, BandServiceImpl, TrackServiceImpl}
 import slick.jdbc.JdbcBackend.Database
 
+import scala.concurrent.duration._
 import scala.io.StdIn
 import scala.util.Using
 
 object Main {
   def main(args: Array[String]): Unit = {
-    implicit val system: ActorSystem = ActorSystem("system")
+    implicit val classicSystem: CLassicActorSystem = CLassicActorSystem("classicSystem")
 
-    import system.dispatcher
+    import classicSystem.dispatcher
 
     val config = DbConfig.default
 
@@ -38,15 +43,25 @@ object Main {
       val albumRouter = new AlbumRouter(albumService)
       val trackRouter = new TrackRouter(trackService)
 
-      val musicRouter = new MusicRouterGuard(List(bandRouter, albumRouter, trackRouter))
+      implicit val askTimeout: Timeout = Timeout(5.second)
+      implicit val timeoutDuration: FiniteDuration = 1.second
 
-      val binding = Http().newServerAt("localhost", 8080).bind(musicRouter.route)
+      val system: ActorSystem[GateActor.Message] = ActorSystem(GateActor(bandDao, albumDao, trackDao), "system")
+      implicit val scheduler: Scheduler = system.scheduler
+
+      val musicRouter = new MusicRouterGuard(List(bandRouter, albumRouter, trackRouter))
+      val searchRouter = new SearchRouter(system)
+
+      val binding = Http().newServerAt("localhost", 8080).bind(musicRouter.route ~ searchRouter.route)
 
       binding.foreach(b => println(s"Binding on ${b.localAddress}"))
 
       StdIn.readLine()
 
-      binding.flatMap(_.unbind()).onComplete(_ => system.terminate())
+      binding.flatMap(_.unbind()).onComplete(_ => {
+        classicSystem.terminate
+        system.terminate
+      })
     }
   }
 }

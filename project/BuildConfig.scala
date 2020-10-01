@@ -20,6 +20,7 @@ object BuildConfig {
     val `flyway-core` = "6.5.5"
 
     val slf4j = "1.7.30"
+    val logback = "1.2.3"
 
     val `scalacheck-shapeless_1.14` = "1.2.3"
   }
@@ -37,7 +38,8 @@ object BuildConfig {
     "com.typesafe.akka" %% "akka-stream" % versions.akka,
     "com.typesafe.akka" %% "akka-http" % versions.`akka-http`,
     "com.typesafe.akka" %% "akka-stream-testkit" % versions.akka,
-    "com.typesafe.akka" %% "akka-http-testkit" % versions.`akka-http`
+    "com.typesafe.akka" %% "akka-http-testkit" % versions.`akka-http`,
+    "com.typesafe.akka" %% "akka-actor-typed" % versions.akka
   )
 
   val playJsonDependencies = Seq(
@@ -56,7 +58,8 @@ object BuildConfig {
   )
 
   val logDependencies = Seq(
-    "org.slf4j" % "slf4j-api" % versions.slf4j
+    "org.slf4j" % "slf4j-api" % versions.slf4j,
+    "ch.qos.logback" % "logback-classic" % versions.logback
   )
 
   val projectDependencies: Seq[ModuleID] = testDependencies ++ akkaDependencies ++ playJsonDependencies ++

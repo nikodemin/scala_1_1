@@ -55,3 +55,7 @@ object TrackGetDto {
 }
 
 case class TrackUpdateDto(id: UUID, name: Option[String], duration: Option[Float], album: Option[UUID])
+
+// Search
+
+case class SearchDto(string: String, bands: List[BandGetDto], albums: List[AlbumGetDto], tracks: List[TrackGetDto])

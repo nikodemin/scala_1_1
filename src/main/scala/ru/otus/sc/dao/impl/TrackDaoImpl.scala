@@ -19,6 +19,11 @@ class TrackDaoImpl(db: Database)(implicit ec: ExecutionContext) extends TrackDao
     db.run(action).map(_.toList)
   }
 
+  override def getByNameContaining(name: String): Future[List[TrackRow]] = {
+    val action = tracks.filter(_.name.toLowerCase like s"%${name.toLowerCase}%").result
+    db.run(action).map(_.toList)
+  }
+
   override def getById(id: UUID, forUpdate: Boolean): Future[List[TrackRow]] = {
     val query = tracks.filter(_.id === id)
     val resQuery = if (forUpdate) query.forUpdate else query
@@ -48,4 +53,5 @@ class TrackDaoImpl(db: Database)(implicit ec: ExecutionContext) extends TrackDao
     val action = albums.filter(_.name === albumName).flatMap(a => tracks.filter(_.albumId === a.id)).result
     db.run(action).map(_.toList)
   }
+
 }

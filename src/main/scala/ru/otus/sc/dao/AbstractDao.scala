@@ -13,6 +13,8 @@ import scala.concurrent.Future
 abstract class AbstractDao[IN, OUT] {
   def getByName(name: String): Future[List[OUT]]
 
+  def getByNameContaining(name: String): Future[List[OUT]]
+
   /**
    * Returns list of joined entities
    *
