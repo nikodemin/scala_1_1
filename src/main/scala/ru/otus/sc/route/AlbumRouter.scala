@@ -1,67 +1,81 @@
 package ru.otus.sc.route
 
-import akka.http.scaladsl.model.StatusCodes
-import akka.http.scaladsl.server.Directives._
+import java.util.UUID
+
+import akka.http.scaladsl.server.Directives._enhanceRouteWithConcatenation
 import akka.http.scaladsl.server.Route
-import de.heikoseeberger.akkahttpplayjson.PlayJsonSupport._
-import play.api.libs.json.{Json, OFormat}
-import ru.otus.sc.model.dto.{AlbumAddDto, AlbumGetDto, AlbumUpdateDto, TrackGetDto}
+import ru.otus.sc.model.dto.{AlbumAddDto, AlbumGetDto, AlbumUpdateDto}
 import ru.otus.sc.route.interfaces.MusicRouter
+import ru.otus.sc.route.util.Implicits._
 import ru.otus.sc.service.AlbumService
+import sttp.model.StatusCode
+import sttp.tapir._
+import sttp.tapir.json.circe._
+import sttp.tapir.server.akkahttp._
 
-class AlbumRouter(albumService: AlbumService) extends MusicRouter {
-  private implicit lazy val trackGetDtoFormat: OFormat[TrackGetDto] = Json.format
-  private implicit lazy val albumGetFormat: OFormat[AlbumGetDto] = Json.format
-  private implicit lazy val albumAddFormat: OFormat[AlbumAddDto] = Json.format
-  private implicit lazy val albumUpdateFormat: OFormat[AlbumUpdateDto] = Json.format
+import scala.concurrent.ExecutionContext
 
-  override def route: Route = pathPrefix("album") {
-    getById ~ getByBandId ~ getAllAlbums ~ getAlbumByName ~ addAlbum ~ updateAlbum ~ deleteAlbum
-  }
 
-  private val getById: Route = (get & path("id" / JavaUUID) & pathEnd) { id =>
-    onSuccess(albumService.getById(id)) {
-      case None => complete(StatusCodes.NotFound)
-      case Some(album) => complete(album)
-    }
-  }
+class AlbumRouter(albumService: AlbumService)(implicit executionContext: ExecutionContext) extends MusicRouter {
 
-  private val getByBandId: Route = (get & path("bandID" / JavaUUID)) { bandId =>
-    onSuccess(albumService.getByBand(bandId)) {
-      list: List[AlbumGetDto] => complete(list)
-    }
-  }
+  override lazy val route: Route = getByIdRoute ~ getByBandIdRoute ~ getAllAlbumsRoute ~ getAlbumByNameRoute ~
+    addAlbumRoute ~ updateAlbumRoute ~ deleteAlbumRoute
 
-  private val getAllAlbums: Route = (get & pathEnd) {
-    onSuccess(albumService.getAll) {
-      list: List[AlbumGetDto] => complete(list)
-    }
-  }
+  override lazy val endpoints: List[Endpoint[_, _, _, _]] = List(getById, getByBandId, getAllAlbums, getAlbumByName,
+    addAlbum, updateAlbum, deleteAlbum)
 
-  private val getAlbumByName: Route = (get & path("name" / Segment) & pathEnd) { name =>
-    onSuccess(albumService.getByName(name)) {
-      list: List[AlbumGetDto] => complete(list)
-    }
-  }
+  private val albumEndpoint = endpoint.in("album").tag("album")
 
-  private val addAlbum: Route = (post & entity(as[AlbumAddDto]) & pathEnd) { album =>
-    onSuccess(albumService.add(album)) {
-      case true => complete(StatusCodes.Created)
-      case false => complete(StatusCodes.BadRequest)
-    }
-  }
+  private val getById = albumEndpoint
+    .get
+    .in("id")
+    .in(path[UUID]("id"))
+    .out(jsonBody[AlbumGetDto])
+    .errorOut(statusCode(StatusCode.NotFound))
 
-  private val updateAlbum: Route = (put & entity(as[AlbumUpdateDto]) & pathEnd) { album =>
-    onSuccess(albumService.update(album)) {
-      case true => complete(StatusCodes.OK)
-      case false => complete(StatusCodes.BadRequest)
-    }
-  }
+  private val getByIdRoute = getById.toRoute(albumService.getById)
 
-  private val deleteAlbum: Route = (delete & path("id" / JavaUUID) & pathEnd) { albumId =>
-    onSuccess(albumService.delete(albumId)) {
-      case true => complete(StatusCodes.OK)
-      case false => complete(StatusCodes.BadRequest)
-    }
-  }
+  private val getByBandId = albumEndpoint
+    .get
+    .in("id")
+    .in(path[UUID]("id"))
+    .out(jsonBody[List[AlbumGetDto]])
+
+  private val getByBandIdRoute = getByBandId.toRoute(albumService.getByBand)
+
+  private val getAllAlbums = albumEndpoint
+    .get
+    .out(jsonBody[List[AlbumGetDto]])
+
+  private val getAllAlbumsRoute = getAllAlbums.toRoute(_ => albumService.getAll)
+
+  private val getAlbumByName = albumEndpoint
+    .get
+    .in("name")
+    .in(path[String]("name"))
+    .out(jsonBody[List[AlbumGetDto]])
+
+  private val getAlbumByNameRoute = getAlbumByName.toRoute(albumService.getByName)
+
+  private val addAlbum = albumEndpoint
+    .post
+    .in(jsonBody[AlbumAddDto])
+    .out(jsonBody[Boolean])
+
+  private val addAlbumRoute = addAlbum.toRoute(albumService.add)
+
+  private val updateAlbum = albumEndpoint
+    .put
+    .in(jsonBody[AlbumUpdateDto])
+    .out(jsonBody[Boolean])
+
+  private val updateAlbumRoute = updateAlbum.toRoute(albumService.update)
+
+  private val deleteAlbum = albumEndpoint
+    .delete
+    .in("id")
+    .in(path[UUID]("id"))
+    .out(jsonBody[Boolean])
+
+  private val deleteAlbumRoute = deleteAlbum.toRoute(albumService.delete)
 }

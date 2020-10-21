@@ -1,72 +1,88 @@
 package ru.otus.sc.route
 
-import akka.http.scaladsl.model.StatusCodes
-import akka.http.scaladsl.server.Directives._
+import java.util.UUID
+
+import akka.http.scaladsl.server.Directives._enhanceRouteWithConcatenation
 import akka.http.scaladsl.server.Route
-import de.heikoseeberger.akkahttpplayjson.PlayJsonSupport._
-import play.api.libs.json.{Json, OFormat}
 import ru.otus.sc.model.dto.{TrackAddDto, TrackGetDto, TrackUpdateDto}
 import ru.otus.sc.route.interfaces.MusicRouter
+import ru.otus.sc.route.util.Implicits._
 import ru.otus.sc.service.TrackService
+import sttp.model.StatusCode
+import sttp.tapir._
+import sttp.tapir.json.circe._
+import sttp.tapir.server.akkahttp._
 
-class TrackRouter(trackService: TrackService) extends MusicRouter {
-  private implicit lazy val trackGetDtoFormat: OFormat[TrackGetDto] = Json.format
-  private implicit lazy val trackUpdateDtoFormat: OFormat[TrackUpdateDto] = Json.format
-  private implicit lazy val trackAddDtoFormat: OFormat[TrackAddDto] = Json.format
+import scala.concurrent.ExecutionContext
 
-  override def route: Route = pathPrefix("track") {
-    getByAlbumId ~ getTrackByName ~ getTrackById ~ getTracksByAlbumName ~ getAllTracks ~ addTrack ~ updateTrack ~ deleteTrack
-  }
+class TrackRouter(trackService: TrackService)(implicit executionContext: ExecutionContext) extends MusicRouter {
 
-  private val getTrackById: Route = (get & path("id" / JavaUUID) & pathEnd) { id =>
-    onSuccess(trackService.getById(id)) {
-      case None => complete(StatusCodes.NotFound)
-      case Some(track) => complete(track)
-    }
-  }
+  override lazy val route: Route = getTrackByIdRoute ~ getByAlbumIdRoute ~ getTrackByNameRoute ~ getAllTracksRoute ~
+    getTracksByAlbumNameRoute ~ addTrackRoute ~ updateTrackRoute ~ deleteTrackRoute
 
-  private val getByAlbumId: Route = (get & path("albumID" / JavaUUID)) { albumID =>
-    onSuccess(trackService.getByAlbum(albumID)) {
-      list: List[TrackGetDto] => complete(list)
-    }
-  }
+  override lazy val endpoints: List[Endpoint[_, _, _, _]] = List(getTrackById, getByAlbumId, getTrackByName,
+    getAllTracks, getTracksByAlbumName, addTrack, updateTrack, deleteTrack)
 
-  private val getTrackByName: Route = (get & path("name" / Segment) & pathEnd) { name =>
-    onSuccess(trackService.getByName(name)) {
-      list: List[TrackGetDto] => complete(list)
-    }
-  }
+  private val trackEndpoint = endpoint.tag("track").in("track")
 
-  private val getAllTracks: Route = (get & pathEnd) {
-    onSuccess(trackService.getAll) {
-      list: List[TrackGetDto] => complete(list)
-    }
-  }
+  private val getTrackById = trackEndpoint
+    .get
+    .in("id")
+    .in(path[UUID]("id"))
+    .out(jsonBody[TrackGetDto])
+    .errorOut(statusCode(StatusCode.NotFound))
 
-  private val getTracksByAlbumName: Route = (get & path("albumName" / Segment) & pathEnd) { albumName =>
-    onSuccess(trackService.getByAlbumName(albumName)) {
-      list: List[TrackGetDto] => complete(list)
-    }
-  }
+  private val getTrackByIdRoute = getTrackById.toRoute(trackService.getById)
 
-  private val addTrack: Route = (post & entity(as[TrackAddDto]) & pathEnd) { track =>
-    onSuccess(trackService.add(track)) {
-      case true => complete(StatusCodes.Created)
-      case false => complete(StatusCodes.BadRequest)
-    }
-  }
+  private val getByAlbumId = trackEndpoint
+    .get
+    .in("albumId")
+    .in(path[UUID]("albumId"))
+    .out(jsonBody[List[TrackGetDto]])
 
-  private val updateTrack: Route = (put & entity(as[TrackUpdateDto]) & pathEnd) { track =>
-    onSuccess(trackService.update(track)) {
-      case true => complete(StatusCodes.OK)
-      case false => complete(StatusCodes.BadRequest)
-    }
-  }
+  private val getByAlbumIdRoute = getByAlbumId.toRoute(trackService.getByAlbum)
 
-  private val deleteTrack: Route = (delete & path("id" / JavaUUID) & pathEnd) { trackId =>
-    onSuccess(trackService.delete(trackId)) {
-      case true => complete(StatusCodes.OK)
-      case false => complete(StatusCodes.BadRequest)
-    }
-  }
+  private val getTrackByName = trackEndpoint
+    .get
+    .in("name")
+    .in(path[String]("name"))
+    .out(jsonBody[List[TrackGetDto]])
+
+  private val getTrackByNameRoute = getTrackByName.toRoute(trackService.getByName)
+
+  private val getAllTracks = trackEndpoint
+    .get
+    .out(jsonBody[List[TrackGetDto]])
+
+  private val getAllTracksRoute = getAllTracks.toRoute(_ => trackService.getAll)
+
+  private val getTracksByAlbumName = trackEndpoint
+    .get
+    .in("albumName")
+    .in(path[String]("albumName"))
+    .out(jsonBody[List[TrackGetDto]])
+
+  private val getTracksByAlbumNameRoute = getTracksByAlbumName.toRoute(trackService.getByAlbumName)
+
+  private val addTrack = trackEndpoint
+    .post
+    .in(jsonBody[TrackAddDto])
+    .out(jsonBody[Boolean])
+
+  private val addTrackRoute = addTrack.toRoute(trackService.add)
+
+  private val updateTrack = trackEndpoint
+    .put
+    .in(jsonBody[TrackUpdateDto])
+    .out(jsonBody[Boolean])
+
+  private val updateTrackRoute = updateTrack.toRoute(trackService.update)
+
+  private val deleteTrack = trackEndpoint
+    .delete
+    .in("id")
+    .in(path[UUID]("id"))
+    .out(jsonBody[Boolean])
+
+  private val deleteTrackRoute = deleteTrack.toRoute(trackService.delete)
 }

@@ -15,7 +15,7 @@ class TrackDaoImpl(db: Database)(implicit ec: ExecutionContext) extends TrackDao
   }
 
   override def getByName(name: String): Future[List[TrackRow]] = {
-    val action = tracks.filter(_.name === name).result
+    val action = tracks.filter(_.name.toLowerCase === name.toLowerCase).result
     db.run(action).map(_.toList)
   }
 

@@ -11,12 +11,12 @@ import scala.concurrent.{ExecutionContext, Future}
 
 class BandDaoImpl(db: Database)(implicit ec: ExecutionContext) extends BandDao {
   override def getBySinger(name: String): Future[List[(BandRow, AlbumRow)]] = {
-    val action = joinAlbum.filter(_._1.singer === name).result
+    val action = joinAlbum.filter(_._1.singer.toLowerCase === name.toLowerCase).result
     db.run(action).map(_.toList)
   }
 
   override def getByName(name: String): Future[List[(BandRow, AlbumRow)]] = {
-    val action = joinAlbum.filter(_._1.name === name).result
+    val action = joinAlbum.filter(_._1.name.toLowerCase === name.toLowerCase).result
     db.run(action).map(_.toList)
   }
 

@@ -1,69 +1,80 @@
 package ru.otus.sc.route
 
-import akka.http.scaladsl.model.StatusCodes
-import akka.http.scaladsl.server.Directives._
+import java.util.UUID
+
+import akka.http.scaladsl.server.Directives._enhanceRouteWithConcatenation
 import akka.http.scaladsl.server.Route
-import de.heikoseeberger.akkahttpplayjson.PlayJsonSupport._
-import play.api.libs.json.{Json, OFormat}
 import ru.otus.sc.model.dto._
 import ru.otus.sc.route.interfaces.MusicRouter
+import ru.otus.sc.route.util.Implicits._
 import ru.otus.sc.service.BandService
+import sttp.model.StatusCode
+import sttp.tapir._
+import sttp.tapir.json.circe._
+import sttp.tapir.server.akkahttp._
 
-class BandRouter(bandService: BandService) extends MusicRouter {
-  private implicit lazy val trackGetDtoFormat: OFormat[TrackGetDto] = Json.format
-  private implicit lazy val albumGetDtoFormat: OFormat[AlbumGetDto] = Json.format
-  private implicit lazy val bandGetDtoFormat: OFormat[BandGetDto] = Json.format
-  private implicit lazy val bandAddDtoFormat: OFormat[BandAddDto] = Json.format
-  private implicit lazy val bandUpdateDtoFormat: OFormat[BandUpdateDto] = Json.format
+import scala.concurrent.ExecutionContext
 
-  override def route: Route = pathPrefix("band") {
-    getBandByID ~ getAllBands ~ getBandByName ~ getBandBySinger ~ addBand ~ updateBand ~ deleteBand
-  }
+class BandRouter(bandService: BandService)(implicit executionContext: ExecutionContext) extends MusicRouter {
+  override lazy val route: Route = getBandByIdRoute ~ getBandByNameRoute ~ getBandBySingerRoute ~
+    getAllBandsRoute ~ addBandRoute ~ updateBandRoute ~ deleteBandRoute
 
-  private val getBandByID: Route = (get & path("id" / JavaUUID) & pathEnd) { id =>
-    onSuccess(bandService.getById(id)) {
-      case Some(band) => complete(band)
-      case None => complete(StatusCodes.NotFound)
-    }
-  }
+  override lazy val endpoints: List[Endpoint[_, _, _, _]] = List(getBandById, getBandByName, getBandBySinger,
+    getAllBands, addBand, updateBand, deleteBand)
 
-  private val getBandByName: Route = (get & path("name" / Segment) & pathEnd) { name =>
-    onSuccess(bandService.getByName(name)) {
-      case Some(band) => complete(band)
-      case None => complete(StatusCodes.NotFound)
-    }
-  }
+  private val bandEndpoint = endpoint.in("band").tag("band")
 
-  private val getBandBySinger: Route = (get & path("singerName" / Segment) & pathEnd) { name =>
-    onSuccess(bandService.getBySinger(name)) {
-      list: List[BandGetDto] => complete(list)
-    }
-  }
+  private val getBandById = bandEndpoint
+    .get
+    .in("id")
+    .in(path[UUID]("id"))
+    .out(jsonBody[BandGetDto])
+    .errorOut(statusCode(StatusCode.NotFound))
 
-  private val getAllBands: Route = (get & pathEnd) {
-    onSuccess(bandService.getAll) {
-      list: List[BandGetDto] => complete(list)
-    }
-  }
+  private val getBandByIdRoute = getBandById.toRoute(bandService.getById)
 
-  private val addBand: Route = (post & entity(as[BandAddDto]) & pathEnd) { band =>
-    onSuccess(bandService.add(band)) {
-      case true => complete(StatusCodes.Created)
-      case false => complete(StatusCodes.BadRequest)
-    }
-  }
+  private val getBandByName = bandEndpoint
+    .get
+    .in("name")
+    .in(path[String]("name"))
+    .out(jsonBody[BandGetDto])
+    .errorOut(statusCode(StatusCode.NotFound))
 
-  private val updateBand: Route = (put & entity(as[BandUpdateDto]) & pathEnd) { band =>
-    onSuccess(bandService.update(band)) {
-      case true => complete(StatusCodes.OK)
-      case false => complete(StatusCodes.BadRequest)
-    }
-  }
+  private val getBandByNameRoute = getBandByName.toRoute(bandService.getByName)
 
-  private val deleteBand: Route = (delete & path("id" / JavaUUID) & pathEnd) { id =>
-    onSuccess(bandService.delete(id)) {
-      case true => complete(StatusCodes.OK)
-      case false => complete(StatusCodes.BadRequest)
-    }
-  }
+  private val getBandBySinger = bandEndpoint
+    .get
+    .in("singer")
+    .in(path[String]("singer"))
+    .out(jsonBody[List[BandGetDto]])
+
+  private val getBandBySingerRoute = getBandBySinger.toRoute(bandService.getBySinger)
+
+  private val getAllBands = bandEndpoint
+    .get
+    .out(jsonBody[List[BandGetDto]])
+
+  private val getAllBandsRoute = getAllBands.toRoute(_ => bandService.getAll)
+
+  private val addBand = bandEndpoint
+    .post
+    .in(jsonBody[BandAddDto])
+    .out(jsonBody[Boolean])
+
+  private val addBandRoute = addBand.toRoute(bandService.add)
+
+  private val updateBand = bandEndpoint
+    .put
+    .in(jsonBody[BandUpdateDto])
+    .out(jsonBody[Boolean])
+
+  private val updateBandRoute = updateBand.toRoute(bandService.update)
+
+  private val deleteBand = bandEndpoint
+    .delete
+    .in("id")
+    .in(path[UUID]("id"))
+    .out(jsonBody[Boolean])
+
+  private val deleteBandRoute = deleteBand.toRoute(bandService.delete)
 }

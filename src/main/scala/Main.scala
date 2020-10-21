@@ -10,6 +10,9 @@ import ru.otus.sc.dao.impl.{AlbumDaoImpl, BandDaoImpl, TrackDaoImpl}
 import ru.otus.sc.route._
 import ru.otus.sc.service.impl.{AlbumServiceImpl, BandServiceImpl, TrackServiceImpl}
 import slick.jdbc.JdbcBackend.Database
+import sttp.tapir.docs.openapi._
+import sttp.tapir.openapi.circe.yaml._
+import sttp.tapir.swagger.akkahttp.SwaggerAkka
 
 import scala.concurrent.duration._
 import scala.io.StdIn
@@ -49,10 +52,15 @@ object Main {
       val system: ActorSystem[GateActor.Message] = ActorSystem(GateActor(bandDao, albumDao, trackDao), "system")
       implicit val scheduler: Scheduler = system.scheduler
 
-      val musicRouter = new MusicRouterGuard(List(bandRouter, albumRouter, trackRouter))
+      val musicRouter = new MusicRouterGuard(List(albumRouter, bandRouter, trackRouter), albumRouter.endpoints ++
+        bandRouter.endpoints ++ trackRouter.endpoints)
       val searchRouter = new SearchRouter(system)
 
-      val binding = Http().newServerAt("localhost", 8080).bind(musicRouter.route ~ searchRouter.route)
+      val openApiYaml = (musicRouter.endpoints ++ searchRouter.endpoints)
+        .toOpenAPI("Music db", "1.0.0").toYaml
+
+      val binding = Http().newServerAt("localhost", 8080).bind(musicRouter.route ~
+        (new SwaggerAkka(openApiYaml)).routes ~ searchRouter.route)
 
       binding.foreach(b => println(s"Binding on ${b.localAddress}"))
 

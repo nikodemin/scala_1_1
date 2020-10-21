@@ -16,7 +16,7 @@ class AlbumDaoImpl(db: Database)(implicit ec: ExecutionContext) extends AlbumDao
   }
 
   override def getByName(name: String): Future[List[(AlbumRow, TrackRow)]] = {
-    val action = joinTracks.filter(_._1.name === name).result
+    val action = joinTracks.filter(_._1.name.toLowerCase === name.toLowerCase).result
     db.run(action).map(_.toList)
   }
 
@@ -51,5 +51,4 @@ class AlbumDaoImpl(db: Database)(implicit ec: ExecutionContext) extends AlbumDao
   override def deleteById(id: UUID): Future[Boolean] = db.run(albums.filter(_.id === id).delete).map(_ > 0)
 
   private def joinTracks = albums join tracks on (_.id === _.albumId)
-
 }
