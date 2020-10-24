@@ -3,42 +3,49 @@ package ru.otus.sc.dao.impl
 import java.util.UUID
 
 import ru.otus.sc.dao.TrackDao
-import ru.otus.sc.model.entity.{Album, Track}
+import ru.otus.sc.model.entity.MusicEntities._
+import slick.jdbc.PostgresProfile.api._
 
-class TrackDaoImpl extends TrackDao {
-  override def getByAlbum(album: Album): List[Track] = Tracks.all.filter(track => track.album == album.id).toList
+import scala.concurrent.{ExecutionContext, Future}
 
-  override def getByName(name: String): Option[Track] = Tracks.all.find(track => track.name == name)
-
-  override def getById(id: UUID): Option[Track] = Tracks.all.find(track => track.id == id)
-
-  override def getAll: List[Track] = Tracks.all.toList
-
-  override def add(element: Track): Boolean = {
-    Tracks.all.addOne(element)
-    true
+class TrackDaoImpl(db: Database)(implicit ec: ExecutionContext) extends TrackDao {
+  override def getByAlbum(albumId: UUID): Future[List[TrackRow]] = {
+    val action = tracks.filter(_.albumId === albumId).result
+    db.run(action).map(_.toList)
   }
 
-  override def update(element: Track): Boolean = {
-    val index = Tracks.all.indexWhere(track => track.id == element.id)
-
-    if (index == -1) {
-      false
-    } else {
-      Tracks.all.remove(index)
-      Tracks.all.addOne(element)
-      true
-    }
+  override def getByName(name: String): Future[List[TrackRow]] = {
+    val action = tracks.filter(_.name === name).result
+    db.run(action).map(_.toList)
   }
 
-  override def deleteById(id: UUID): Boolean = {
-    val index = Tracks.all.indexWhere(track => track.id == id)
+  override def getById(id: UUID, forUpdate: Boolean): Future[List[TrackRow]] = {
+    val query = tracks.filter(_.id === id)
+    val resQuery = if (forUpdate) query.forUpdate else query
+    db.run(resQuery.result).map(_.toList)
+  }
 
-    if (index == -1) {
-      false
-    } else {
-      Tracks.all.remove(index)
-      true
+  override def getAll: Future[List[TrackRow]] = db.run(tracks.result).map(_.toList)
+
+  override def add(track: TrackRow): Future[Boolean] = {
+    val action = albums.filter(_.id === track.albumId).exists.result.flatMap {
+      case true => tracks += track
+      case false => DBIO.from(Future(0))
     }
+    db.run(action).map(_ > 0)
+  }
+
+  override def update(track: TrackRow): Future[Boolean] = {
+    val action = tracks.filter(_.id === track.id)
+      .map(t => (t.name, t.duration, t.albumId))
+      .update((track.name, track.duration, track.albumId))
+    db.run(action).map(_ > 0)
+  }
+
+  override def deleteById(id: UUID): Future[Boolean] = db.run(tracks.filter(_.id === id).delete).map(_ > 0)
+
+  override def getByAlbumName(albumName: String): Future[List[TrackRow]] = {
+    val action = albums.filter(_.name === albumName).flatMap(a => tracks.filter(_.albumId === a.id)).result
+    db.run(action).map(_.toList)
   }
 }

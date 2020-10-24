@@ -3,42 +3,50 @@ package ru.otus.sc.dao.impl
 import java.util.UUID
 
 import ru.otus.sc.dao.BandDao
-import ru.otus.sc.model.entity.Band
+import ru.otus.sc.model.entity.MusicEntities._
+import slick.jdbc.PostgresProfile.api._
 
-class BandDaoImpl extends BandDao {
-  override def getBySinger(name: String): List[Band] = Bands.all.filter(band => band.singer == name).toList
+import scala.concurrent.{ExecutionContext, Future}
 
-  override def getByName(name: String): Option[Band] = Bands.all.find(band => band.name == name)
 
-  override def getById(id: UUID): Option[Band] = Bands.all.find(band => band.id == id)
-
-  override def getAll: List[Band] = Bands.all.toList
-
-  override def add(element: Band): Boolean = {
-    Bands.all.addOne(element)
-    true
+class BandDaoImpl(db: Database)(implicit ec: ExecutionContext) extends BandDao {
+  override def getBySinger(name: String): Future[List[(BandRow, AlbumRow)]] = {
+    val action = joinAlbum.filter(_._1.singer === name).result
+    db.run(action).map(_.toList)
   }
 
-  override def update(element: Band): Boolean = {
-    val index = Bands.all.indexWhere(band => band.id == element.id)
-
-    if (index == -1) {
-      false
-    } else {
-      Bands.all.remove(index)
-      Bands.all.addOne(element)
-      true
-    }
+  override def getByName(name: String): Future[List[(BandRow, AlbumRow)]] = {
+    val action = joinAlbum.filter(_._1.name === name).result
+    db.run(action).map(_.toList)
   }
 
-  override def deleteById(id: UUID): Boolean = {
-    val index = Bands.all.indexWhere(band => band.id == id)
-
-    if (index == -1) {
-      false
-    } else {
-      Bands.all.remove(index)
-      true
-    }
+  override def getById(id: UUID, forUpdate: Boolean): Future[List[(BandRow, AlbumRow)]] = {
+    val query = joinAlbum.filter(_._1.id === id)
+    val resQuery = if (forUpdate) query.forUpdate else query
+    db.run(resQuery.result).map(_.toList)
   }
+
+  override def getAll: Future[List[(BandRow, AlbumRow)]] = {
+    val action = joinAlbum.result
+    db.run(action).map(_.toList)
+  }
+
+  override def add(band: BandRow): Future[Boolean] = {
+    val action = bands += band
+    db.run(action).map(_ > 0)
+  }
+
+  override def update(band: BandRow): Future[Boolean] = {
+    val action = bands.filter(_.id === band.id.get)
+      .map(b => (b.name, b.singer, b.established))
+      .update((band.name, band.singer, band.established))
+    db.run(action).map(_ > 0)
+  }
+
+  override def deleteById(id: UUID): Future[Boolean] = {
+    val action = bands.filter(_.id === id).delete
+    db.run(action).map(_ > 0)
+  }
+
+  private def joinAlbum: Query[(Band, Album), (BandRow, AlbumRow), Seq] = bands join albums on (_.id === _.bandId)
 }
