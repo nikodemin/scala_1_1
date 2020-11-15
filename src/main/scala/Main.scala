@@ -1,75 +1,64 @@
-import akka.actor.typed.{ActorSystem, Scheduler}
-import akka.actor.{ActorSystem => CLassicActorSystem}
-import akka.http.scaladsl.Http
-import akka.http.scaladsl.server.Directives._
-import akka.util.Timeout
-import org.flywaydb.core.Flyway
-import ru.otus.sc.actor.GateActor
-import ru.otus.sc.config.DbConfig
-import ru.otus.sc.dao.impl.{AlbumDaoImpl, BandDaoImpl, TrackDaoImpl}
-import ru.otus.sc.route._
-import ru.otus.sc.service.impl.{AlbumServiceImpl, BandServiceImpl, TrackServiceImpl}
-import slick.jdbc.JdbcBackend.Database
-import sttp.tapir.docs.openapi._
-import sttp.tapir.openapi.circe.yaml._
-import sttp.tapir.swagger.akkahttp.SwaggerAkka
+import cats.syntax.semigroupk._
+import org.http4s.server.blaze.BlazeServerBuilder
+import org.http4s.server.{Router, Server}
+import org.http4s.syntax.kleisli._
+import ru.otus.sc.dao.AlbumDao.AlbumDao
+import ru.otus.sc.dao.BandDao.BandDao
+import ru.otus.sc.dao.TrackDao.TrackDao
+import ru.otus.sc.dao.{AlbumDao, BandDao, TrackDao}
+import ru.otus.sc.db.DbProvider.Db
+import ru.otus.sc.db.Migrations.Migrations
+import ru.otus.sc.db.{DbConfig, DbProvider, Migrations}
+import ru.otus.sc.route.interfaces.MusicRouter
+import ru.otus.sc.route.interfaces.MusicRouter.{AlbumRouter, BandRouter, ServerConfig, TrackRouter}
+import ru.otus.sc.route.{AlbumRouterImpl, BandRouterImpl, TrackRouterImpl}
+import ru.otus.sc.service.AlbumService.AlbumService
+import ru.otus.sc.service.BandService.BandService
+import ru.otus.sc.service.TrackService.TrackService
+import ru.otus.sc.service.{AlbumService, BandService, TrackService}
+import sttp.tapir.server.http4s.Http4sServerOptions
+import zio.interop.catz._
+import zio.interop.catz.implicits._
+import zio.{Task, _}
 
-import scala.concurrent.duration._
-import scala.io.StdIn
-import scala.util.Using
+object Main extends zio.App {
 
-object Main {
-  def main(args: Array[String]): Unit = {
-    implicit val classicSystem: CLassicActorSystem = CLassicActorSystem("classicSystem")
+  type Dbs = Has[DbConfig] with Db with Migrations
+  type Daos = AlbumDao with BandDao with TrackDao
+  type Services = AlbumService with BandService with TrackService
+  type Routers = BandRouter with AlbumRouter with TrackRouter
+  type Http4Server = Has[Server[Task]]
 
-    import classicSystem.dispatcher
-
-    val config = DbConfig.default
-
-    Using.resource(Database.forURL(config.dbUrl, config.dbUserName, config.dbPassword)) { db =>
-
-      Flyway
-        .configure()
-        .dataSource(config.dbUrl, config.dbUserName, config.dbPassword)
-        .load()
-        .migrate()
-
-      val albumDao = new AlbumDaoImpl(db)
-      val bandDao = new BandDaoImpl(db)
-      val trackDao = new TrackDaoImpl(db)
-
-      val bandService = new BandServiceImpl(bandDao)
-      val albumService = new AlbumServiceImpl(albumDao)
-      val trackService = new TrackServiceImpl(trackDao)
-
-      val bandRouter = new BandRouter(bandService)
-      val albumRouter = new AlbumRouter(albumService)
-      val trackRouter = new TrackRouter(trackService)
-
-      implicit val askTimeout: Timeout = Timeout(5.second)
-      implicit val timeoutDuration: FiniteDuration = 1.second
-
-      val system: ActorSystem[GateActor.Message] = ActorSystem(GateActor(bandDao, albumDao, trackDao), "system")
-      implicit val scheduler: Scheduler = system.scheduler
-
-      val musicRouter = new MusicRouterGuard(List(albumRouter, bandRouter, trackRouter), albumRouter.endpoints ++
-        bandRouter.endpoints ++ trackRouter.endpoints)
-      val searchRouter = new SearchRouter(system)
-
-      val openApiYaml = (musicRouter.endpoints ++ searchRouter.endpoints)
-        .toOpenAPI("Music db", "1.0.0").toYaml
-
-      val binding = Http().newServerAt("localhost", 8080).bind(musicRouter.route ~
-        (new SwaggerAkka(openApiYaml)).routes ~ searchRouter.route)
-
-      binding.foreach(b => println(s"Binding on ${b.localAddress}"))
-
-      StdIn.readLine()
-
-      binding.flatMap(_.unbind()).onComplete(_ => {
-        classicSystem.terminate
-        system.terminate
-      })
+  def createHttp4Server: RManaged[ZEnv with Routers, Server[Task]] =
+    ZManaged.runtime[ZEnv with Routers].flatMap { implicit runtime: Runtime[ZEnv with Routers] =>
+      BlazeServerBuilder[Task](runtime.platform.executor.asEC)
+        .bindHttp(8080, "localhost")
+        .withHttpApp(Router("/" ->
+          (runtime.environment.get[AlbumRouterImpl].route <+>
+            runtime.environment.get[BandRouterImpl].route <+>
+            runtime.environment.get[TrackRouterImpl].route)
+        ).orNotFound)
+        .resource
+        .toManagedZIO
     }
-  }
+
+  def createHttp4sLayer: RLayer[ZEnv with Routers, Http4Server] = ZLayer.fromManaged(createHttp4Server)
+
+  val db: RLayer[Any, Dbs] = ZIO.succeed(DbConfig.default).toLayer >+> DbProvider.live >+> Migrations.live
+  val dao: RLayer[Dbs, Daos] = AlbumDao.live ++ BandDao.live ++ TrackDao.live
+  val service: RLayer[Daos, Services] = AlbumService.live ++ BandService.live ++ TrackService.live
+  val serverConfig: RLayer[Services, ServerConfig] = ZLayer.fromFunction(_ => Http4sServerOptions.default)
+  val router: RLayer[Services with ServerConfig, Routers] = MusicRouter.albumRouterLive ++ MusicRouter.bandRouterLive ++
+    MusicRouter.trackRouterLive
+
+  val total = db >+> dao >+> service >+> serverConfig >+> router ++ ZEnv.live >+> createHttp4sLayer
+
+  val zio: ZIO[ZEnv with Migrations, Nothing, Unit] = for {
+    migrations <- ZIO.access[Migrations](_.get)
+    _ <- migrations.applyMigrations()
+    _ <- ZIO.never
+  } yield ()
+
+  override def run(args: List[String]): URIO[ZEnv, ExitCode] = zio.provideLayer(total).exitCode
 }
+

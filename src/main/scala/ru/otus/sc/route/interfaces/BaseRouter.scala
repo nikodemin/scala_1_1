@@ -1,10 +1,11 @@
 package ru.otus.sc.route.interfaces
 
-import akka.http.scaladsl.server.Route
-import sttp.tapir.Endpoint
+import org.http4s.HttpRoutes
+import sttp.tapir.ztapir.ZEndpoint
+import zio.Task
 
 trait BaseRouter {
-  def route: Route
+  def route: HttpRoutes[Task]
 
-  def endpoints: List[Endpoint[_, _, _, _]]
+  def endpoints: List[ZEndpoint[_, _, _]]
 }

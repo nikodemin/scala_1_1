@@ -3,8 +3,7 @@ package ru.otus.sc.route.util
 import io.circe.generic.semiauto._
 import io.circe.{Decoder, Encoder}
 import ru.otus.sc.model.dto._
-
-import scala.concurrent.{ExecutionContext, Future}
+import zio.{IO, Task, ZIO}
 
 object Implicits {
   implicit val trackGetDtoDecoder: Decoder[TrackGetDto] = deriveDecoder[TrackGetDto]
@@ -29,15 +28,14 @@ object Implicits {
   implicit val bandUpdateDtoEncoder: Encoder[BandUpdateDto] = deriveEncoder[BandUpdateDto]
   implicit val searchDtoEncoder: Encoder[SearchDto] = deriveEncoder[SearchDto]
 
+  implicit val NotFoundEncoder: Encoder[NotFound] = deriveEncoder[NotFound]
+  implicit val NotFoundDecoder: Decoder[NotFound] = deriveDecoder[NotFound]
 
-  implicit def toEither[T](future: Future[T])(implicit executionContext: ExecutionContext): Future[Right[Nothing, T]] =
-    future.map(Right(_))
+  implicit val InternalServerErrorEncoder: Encoder[InternalServerError] = deriveEncoder[InternalServerError]
+  implicit val InternalServerErrorDecoder: Decoder[InternalServerError] = deriveDecoder[InternalServerError]
 
-  implicit def optionToEither[T](future: Future[Option[T]])(implicit executionContext: ExecutionContext): Future[Either[Unit, T]] =
-    future.map(optionToEitherInternal)
+  implicit def taskOptionToZIO[T](task: Task[Option[T]]): IO[HttpException, T] = task.catchAllCause(cause =>
+    ZIO.fail(InternalServerError(cause.prettyPrint))).someOrFail(NotFound())
 
-  private def optionToEitherInternal[T](option: Option[T]) = option match {
-    case Some(value) => Right(value)
-    case None => Left(())
-  }
+  implicit def taskListToZIO[T](task: Task[T]): IO[HttpException, T] = task.orElseFail(InternalServerError())
 }

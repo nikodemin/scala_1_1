@@ -2,7 +2,7 @@ package ru.otus.sc.dao
 
 import java.util.UUID
 
-import scala.concurrent.Future
+import zio.Task
 
 /**
  * Abstract dao with common operations
@@ -11,9 +11,9 @@ import scala.concurrent.Future
  * @tparam OUT - type of output from DAO layer
  */
 abstract class AbstractDao[IN, OUT] {
-  def getByName(name: String): Future[List[OUT]]
+  def getByName(name: String): Task[List[OUT]]
 
-  def getByNameContaining(name: String): Future[List[OUT]]
+  def getByNameContaining(name: String): Task[List[OUT]]
 
   /**
    * Returns list of joined entities
@@ -22,9 +22,9 @@ abstract class AbstractDao[IN, OUT] {
    * @param forUpdate if entity will be updated
    * @return
    */
-  def getById(id: UUID, forUpdate: Boolean): Future[List[OUT]]
+  def getById(id: UUID, forUpdate: Boolean): Task[List[OUT]]
 
-  def getAll: Future[List[OUT]]
+  def getAll: Task[List[OUT]]
 
   /**
    * Add element
@@ -32,7 +32,7 @@ abstract class AbstractDao[IN, OUT] {
    * @param element element to be added
    * @return true if collection was modified
    */
-  def add(element: IN): Future[Boolean]
+  def add(element: IN): Task[Boolean]
 
   /**
    * Update element. You must set id of updated element
@@ -40,7 +40,7 @@ abstract class AbstractDao[IN, OUT] {
    * @param element element with the id set
    * @return true if element was modified
    */
-  def update(element: IN): Future[Boolean]
+  def update(element: IN): Task[Boolean]
 
   /**
    * Delete element
@@ -48,5 +48,5 @@ abstract class AbstractDao[IN, OUT] {
    * @param id id of element to delete
    * @return true if collection was modified
    */
-  def deleteById(id: UUID): Future[Boolean]
+  def deleteById(id: UUID): Task[Boolean]
 }

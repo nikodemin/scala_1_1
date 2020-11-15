@@ -1,0 +1,15 @@
+<component name="ProjectCodeStyleConfiguration">
+  <code_scheme name="Project" version="173">
+    <ScalaCodeStyleSettings>
+      <option name="alwaysUsedImports">
+        <array>
+          <option value="cats.syntax.semigroupk._" />
+          <option value="org.http4s.syntax.kleisli._" />
+          <option value="zio.interop.catz._" />
+          <option value="zio.interop.catz.implicits._" />
+        </array>
+      </option>
+      <option name="MULTILINE_STRING_CLOSING_QUOTES_ON_NEW_LINE" value="true" />
+    </ScalaCodeStyleSettings>
+  </code_scheme>
+</component>
