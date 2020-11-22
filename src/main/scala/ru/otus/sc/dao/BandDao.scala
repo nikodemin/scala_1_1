@@ -1,5 +1,7 @@
 package ru.otus.sc.dao
 
+import java.util.UUID
+
 import ru.otus.sc.dao.impl.BandDaoImpl
 import ru.otus.sc.db.DbProvider
 import ru.otus.sc.model.entity.MusicEntities.{AlbumRow, BandRow}
@@ -12,8 +14,22 @@ import zio.{Has, RLayer, Task, ZLayer}
 object BandDao {
   type BandDao = Has[Service]
 
-  trait Service extends AbstractDao[BandRow, (BandRow, AlbumRow)] {
+  trait Service {
     def getBySinger(name: String): Task[List[(BandRow, AlbumRow)]]
+
+    def getByName(name: String): Task[List[(BandRow, AlbumRow)]]
+
+    def getByNameContaining(name: String): Task[List[(BandRow, AlbumRow)]]
+
+    def getById(id: UUID, forUpdate: Boolean): Task[List[(BandRow, AlbumRow)]]
+
+    def getAll: Task[List[(BandRow, AlbumRow)]]
+
+    def add(element: BandRow): Task[Boolean]
+
+    def update(element: BandRow): Task[Boolean]
+
+    def deleteById(id: UUID): Task[Boolean]
   }
 
   val live: RLayer[DbProvider.Db, BandDao] = ZLayer.fromFunction(db => {

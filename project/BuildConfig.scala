@@ -23,6 +23,7 @@ object BuildConfig {
     val `scalacheck-shapeless_1.14` = "1.2.3"
 
     val zio = "1.0.3"
+    val `zio-config` = "1.0.0-RC29-1"
     val `zio-logging` = "0.5.2"
     val `zio-interop-cats` = "2.2.0.1"
   }
@@ -68,6 +69,9 @@ object BuildConfig {
   )
 
   val zioDependencies = Seq(
+    "dev.zio" %% "zio-macros" % versions.zio,
+    "dev.zio" %% "zio-config" % versions.`zio-config`,
+    "dev.zio" %% "zio-config-typesafe" % versions.`zio-config`,
     "dev.zio" %% "zio" % versions.zio,
     "dev.zio" %% "zio-test" % versions.zio % Test,
     "dev.zio" %% "zio-test-sbt" % versions.zio % Test,

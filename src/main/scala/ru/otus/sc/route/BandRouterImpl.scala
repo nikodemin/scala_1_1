@@ -30,8 +30,8 @@ class BandRouterImpl(bandService: BandService.Service)(implicit serverOptions: H
   private val bandEndpoint: Endpoint[Unit, HttpException, Unit, Any] =
     endpoint.in("band").tag("band").errorOut(
       oneOf[HttpException](
-        statusMapping(StatusCode.NotFound, jsonBody[NotFound]),
-        statusMapping(StatusCode.InternalServerError, jsonBody[InternalServerError])
+        statusMapping(StatusCode.NotFound, jsonBody[NotFound].description("Not found")),
+        statusMapping(StatusCode.InternalServerError, jsonBody[InternalServerError].description("Internal server Error"))
       )
     )
 
@@ -40,7 +40,6 @@ class BandRouterImpl(bandService: BandService.Service)(implicit serverOptions: H
     .in("id")
     .in(path[UUID]("id"))
     .out(jsonBody[BandGetDto])
-    .errorOut(statusCode(StatusCode.NotFound))
 
   private val getBandByIdRoute = getBandById.toRoutes(bandService.getById)
 
@@ -49,7 +48,6 @@ class BandRouterImpl(bandService: BandService.Service)(implicit serverOptions: H
     .in("name")
     .in(path[String]("name"))
     .out(jsonBody[BandGetDto])
-    .errorOut(statusCode(StatusCode.NotFound))
 
   private val getBandByNameRoute = getBandByName.toRoutes(bandService.getByName)
 

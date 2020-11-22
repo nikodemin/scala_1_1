@@ -16,7 +16,10 @@ import ru.otus.sc.service.AlbumService.AlbumService
 import ru.otus.sc.service.BandService.BandService
 import ru.otus.sc.service.TrackService.TrackService
 import ru.otus.sc.service.{AlbumService, BandService, TrackService}
+import sttp.tapir.docs.openapi._
+import sttp.tapir.openapi.circe.yaml._
 import sttp.tapir.server.http4s.Http4sServerOptions
+import sttp.tapir.swagger.http4s._
 import zio.interop.catz._
 import zio.interop.catz.implicits._
 import zio.{Task, _}
@@ -30,16 +33,22 @@ object Main extends zio.App {
   type Http4Server = Has[Server[Task]]
 
   def createHttp4Server: RManaged[ZEnv with Routers, Server[Task]] =
-    ZManaged.runtime[ZEnv with Routers].flatMap { implicit runtime: Runtime[ZEnv with Routers] =>
-      BlazeServerBuilder[Task](runtime.platform.executor.asEC)
-        .bindHttp(8080, "localhost")
-        .withHttpApp(Router("/" ->
-          (runtime.environment.get[AlbumRouterImpl].route <+>
-            runtime.environment.get[BandRouterImpl].route <+>
-            runtime.environment.get[TrackRouterImpl].route)
-        ).orNotFound)
-        .resource
-        .toManagedZIO
+    ZManaged.runtime[ZEnv with Routers].flatMap {
+      implicit runtime: Runtime[ZEnv with Routers] => {
+        val albumRouter = runtime.environment.get[AlbumRouterImpl]
+        val bandRouter = runtime.environment.get[BandRouterImpl]
+        val trackRouter = runtime.environment.get[TrackRouterImpl]
+        val openApiYaml = List(albumRouter.endpoints, bandRouter.endpoints, trackRouter.endpoints)
+          .flatten.toOpenAPI("Music Service", "1.0.0").toYaml
+        val openApiRoutes = new SwaggerHttp4s(openApiYaml).routes[Task]
+
+        BlazeServerBuilder[Task](runtime.platform.executor.asEC)
+          .bindHttp(8080, "localhost")
+          .withHttpApp(Router("/" -> (albumRouter.route <+> bandRouter.route <+>
+            trackRouter.route <+> openApiRoutes)).orNotFound)
+          .resource
+          .toManagedZIO
+      }
     }
 
   def createHttp4sLayer: RLayer[ZEnv with Routers, Http4Server] = ZLayer.fromManaged(createHttp4Server)

@@ -14,10 +14,24 @@ import zio.{Has, RLayer, Task, ZLayer}
 object TrackDao {
   type TrackDao = Has[Service]
 
-  trait Service extends AbstractDao[TrackRow, TrackRow] {
+  trait Service {
     def getByAlbum(albumID: UUID): Task[List[TrackRow]]
 
     def getByAlbumName(albumName: String): Task[List[TrackRow]]
+
+    def getByName(name: String): Task[List[TrackRow]]
+
+    def getByNameContaining(name: String): Task[List[TrackRow]]
+
+    def getById(id: UUID, forUpdate: Boolean): Task[List[TrackRow]]
+
+    def getAll: Task[List[TrackRow]]
+
+    def add(element: TrackRow): Task[Boolean]
+
+    def update(element: TrackRow): Task[Boolean]
+
+    def deleteById(id: UUID): Task[Boolean]
   }
 
   val live: RLayer[DbProvider.Db, TrackDao] = ZLayer.fromFunction(db => {

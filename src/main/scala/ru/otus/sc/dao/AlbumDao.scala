@@ -14,8 +14,22 @@ import zio.{Has, RLayer, Task, ZLayer}
 object AlbumDao {
   type AlbumDao = Has[Service]
 
-  trait Service extends AbstractDao[AlbumRow, (AlbumRow, TrackRow)] {
+  trait Service {
     def getByBand(bandId: UUID): Task[List[(AlbumRow, TrackRow)]]
+
+    def getByName(name: String): Task[List[(AlbumRow, TrackRow)]]
+
+    def getByNameContaining(name: String): Task[List[(AlbumRow, TrackRow)]]
+
+    def getById(id: UUID, forUpdate: Boolean): Task[List[(AlbumRow, TrackRow)]]
+
+    def getAll: Task[List[(AlbumRow, TrackRow)]]
+
+    def add(element: AlbumRow): Task[Boolean]
+
+    def update(element: AlbumRow): Task[Boolean]
+
+    def deleteById(id: UUID): Task[Boolean]
   }
 
   val live: RLayer[DbProvider.Db, AlbumDao] = ZLayer.fromFunction(db => {

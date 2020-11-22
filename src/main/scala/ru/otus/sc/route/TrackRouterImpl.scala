@@ -32,8 +32,8 @@ class TrackRouterImpl(trackService: TrackService.Service)(implicit serverOptions
   private val trackEndpoint: Endpoint[Unit, HttpException, Unit, Any] =
     endpoint.in("track").tag("track").errorOut(
       oneOf[HttpException](
-        statusMapping(StatusCode.NotFound, jsonBody[NotFound]),
-        statusMapping(StatusCode.InternalServerError, jsonBody[InternalServerError])
+        statusMapping(StatusCode.NotFound, jsonBody[NotFound].description("Not found")),
+        statusMapping(StatusCode.InternalServerError, jsonBody[InternalServerError].description("Internal server Error"))
       )
     )
 
@@ -42,7 +42,6 @@ class TrackRouterImpl(trackService: TrackService.Service)(implicit serverOptions
     .in("id")
     .in(path[UUID]("id"))
     .out(jsonBody[TrackGetDto])
-    .errorOut(statusCode(StatusCode.NotFound))
 
   private val getTrackByIdRoute = getTrackById.toRoutes(trackService.getById)
 

@@ -33,8 +33,8 @@ class AlbumRouterImpl(albumService: AlbumService.Service)(implicit serverOptions
   private val albumEndpoint: Endpoint[Unit, HttpException, Unit, Any] =
     endpoint.in("album").tag("album").errorOut(
       oneOf[HttpException](
-        statusMapping(StatusCode.NotFound, jsonBody[NotFound]),
-        statusMapping(StatusCode.InternalServerError, jsonBody[InternalServerError])
+        statusMapping(StatusCode.NotFound, jsonBody[NotFound].description("Not found")),
+        statusMapping(StatusCode.InternalServerError, jsonBody[InternalServerError].description("Internal server Error"))
       )
     )
 
