@@ -2,24 +2,31 @@ package ru.otus.sc.service
 
 import java.util.UUID
 
+import ru.otus.sc.dao.TrackDao.TrackDao
 import ru.otus.sc.model.dto.{TrackAddDto, TrackGetDto, TrackUpdateDto}
+import ru.otus.sc.service.impl.TrackServiceImpl
+import zio.{Has, RLayer, Task, ZLayer}
 
-import scala.concurrent.Future
+object TrackService {
+  type TrackService = Has[Service]
 
-trait TrackService {
-  def getAll: Future[List[TrackGetDto]]
+  trait Service {
+    def getAll: Task[List[TrackGetDto]]
 
-  def getByAlbum(albumID: UUID): Future[List[TrackGetDto]]
+    def getByAlbum(albumID: UUID): Task[List[TrackGetDto]]
 
-  def getByName(name: String): Future[List[TrackGetDto]]
+    def getByName(name: String): Task[List[TrackGetDto]]
 
-  def getByAlbumName(name: String): Future[List[TrackGetDto]]
+    def getByAlbumName(name: String): Task[List[TrackGetDto]]
 
-  def getById(id: UUID): Future[Option[TrackGetDto]]
+    def getById(id: UUID): Task[Option[TrackGetDto]]
 
-  def add(trackAddDto: TrackAddDto): Future[Boolean]
+    def add(trackAddDto: TrackAddDto): Task[Boolean]
 
-  def update(trackUpdateDto: TrackUpdateDto): Future[Boolean]
+    def update(trackUpdateDto: TrackUpdateDto): Task[Boolean]
 
-  def delete(id: UUID): Future[Boolean]
+    def delete(id: UUID): Task[Boolean]
+  }
+
+  val live: RLayer[TrackDao, TrackService] = ZLayer.fromFunction(dao => new TrackServiceImpl(dao.get))
 }

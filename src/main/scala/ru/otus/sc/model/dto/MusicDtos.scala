@@ -15,7 +15,7 @@ case class BandGetDto(id: UUID, name: String, singer: String, established: Local
 
 object BandGetDto {
   def fromTupleList(tuples: List[(BandRow, AlbumRow)]): List[BandGetDto] = tuples.groupBy(_._1).map {
-    case (band, tuples) => BandGetDto(band.id.get, band.name, band.singer, band.established,
+    case (band, tuples) => BandGetDto(band.id.orNull, band.name, band.singer, band.established,
       tuples.filter(_._1.id == band.id).map(_._2).map(AlbumGetDto.fromAlbumRow(_, List.empty)))
   }.toList
 }
@@ -35,7 +35,7 @@ object AlbumGetDto {
     case (album, tuples) => fromAlbumRow(album, tuples.filter(_._1.id == album.id).map(_._2))
   }.toList
 
-  def fromAlbumRow(albumRow: AlbumRow, tracks: List[TrackRow]): AlbumGetDto = AlbumGetDto(albumRow.id.get, albumRow.name,
+  def fromAlbumRow(albumRow: AlbumRow, tracks: List[TrackRow]): AlbumGetDto = AlbumGetDto(albumRow.id.orNull, albumRow.name,
     albumRow.year, tracks.map(TrackGetDto.fromTrackRow), albumRow.bandId)
 }
 
@@ -50,8 +50,12 @@ case class TrackAddDto(name: String, duration: Float, album: UUID) {
 case class TrackGetDto(id: UUID, name: String, duration: Float, album: UUID)
 
 object TrackGetDto {
-  def fromTrackRow(trackRow: TrackRow): TrackGetDto = TrackGetDto(trackRow.id.get, trackRow.name, trackRow.duration,
+  def fromTrackRow(trackRow: TrackRow): TrackGetDto = TrackGetDto(trackRow.id.orNull, trackRow.name, trackRow.duration,
     trackRow.albumId)
 }
 
 case class TrackUpdateDto(id: UUID, name: Option[String], duration: Option[Float], album: Option[UUID])
+
+// Search
+
+case class SearchDto(string: String, bands: List[BandGetDto], albums: List[AlbumGetDto], tracks: List[TrackGetDto])

@@ -1,4 +1,4 @@
-package ru.otus.sc.config
+package ru.otus.sc.db
 
 case class DbConfig(dbUrl: String, dbUserName: String, dbPassword: String)
 
